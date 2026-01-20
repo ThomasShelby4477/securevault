@@ -13,8 +13,9 @@ class File(db.Model):
     mime_type = db.Column(db.String(100))
     
     # Encryption metadata
-    salt = db.Column(db.LargeBinary(16), nullable=False)  # For key derivation
+    salt = db.Column(db.String(64), nullable=False)  # For key derivation (binary or base64)
     is_locked = db.Column(db.Boolean, default=True)
+    is_e2e = db.Column(db.Boolean, default=False)  # True = encrypted in browser
     
     # Ownership and timestamps
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)

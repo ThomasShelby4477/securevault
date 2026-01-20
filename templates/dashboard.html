@@ -115,23 +115,22 @@
     {% endif %}
 </div>
 
-<!-- Upload Modal -->
+<!-- Upload Modal (E2E Encrypted) -->
 <div id="upload-modal" class="modal">
     <div class="modal-content glass-card">
         <div class="modal-header">
-            <h2>📤 Upload & Encrypt File</h2>
+            <h2>📤 Upload & Encrypt File (E2E)</h2>
             <button class="modal-close" onclick="closeUploadModal()">×</button>
         </div>
-        <form method="POST" action="{{ url_for('files.upload_file') }}" enctype="multipart/form-data"
-            class="upload-form">
-            {{ upload_form.hidden_tag() }}
+        <form id="e2e-upload-form" class="upload-form" onsubmit="return handleE2EUpload(event)">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="upload-zone" id="upload-zone">
                 <div class="upload-zone-content">
                     <span class="upload-icon">📁</span>
                     <p>Drag & drop your file here or</p>
                     <label for="file-input" class="upload-browse">Browse Files</label>
-                    {{ upload_form.file(id="file-input", class="file-input", accept="*/*") }}
+                    <input type="file" id="file-input" class="file-input" accept="*/*">
                 </div>
                 <div class="file-preview" id="file-preview" style="display: none;">
                     <span class="preview-icon">📄</span>
@@ -145,8 +144,8 @@
                     <span class="label-icon">🔐</span> Encryption Password
                 </label>
                 <div class="password-wrapper">
-                    {{ upload_form.password(id="encrypt-password", class="form-input", placeholder="Enter a strong
-                    password") }}
+                    <input type="password" id="encrypt-password" class="form-input"
+                        placeholder="Enter a strong password" required minlength="6">
                     <button type="button" class="toggle-password" onclick="togglePassword('encrypt-password')">
                         <span class="eye-icon">👁️</span>
                     </button>
@@ -155,12 +154,14 @@
                 <p class="form-hint">⚠️ Remember this password! It cannot be recovered.</p>
             </div>
 
+            <div id="upload-status" style="margin-bottom: 1rem; text-align: center;"></div>
+
             <div class="encryption-info">
-                <h4>🛡️ Your file will be protected with:</h4>
+                <h4>🛡️ End-to-End Encryption:</h4>
                 <ul>
-                    <li>✓ AES-256-GCM authenticated encryption</li>
-                    <li>✓ PBKDF2 key derivation (100,000 iterations)</li>
-                    <li>✓ Unique random salt per file</li>
+                    <li>✓ File encrypted IN YOUR BROWSER before upload</li>
+                    <li>✓ Server NEVER sees your unencrypted file</li>
+                    <li>✓ AES-256-GCM + PBKDF2 (100k iterations)</li>
                 </ul>
             </div>
 
@@ -175,15 +176,15 @@
     </div>
 </div>
 
-<!-- Download Modal -->
+<!-- Download Modal (E2E Decryption) -->
 <div id="download-modal" class="modal">
     <div class="modal-content glass-card">
         <div class="modal-header">
-            <h2>📥 Download & Decrypt</h2>
+            <h2>📥 Download & Decrypt (E2E)</h2>
             <button class="modal-close" onclick="closeDownloadModal()">×</button>
         </div>
-        <form method="POST" id="download-form" class="download-form">
-            {{ password_form.hidden_tag() }}
+        <form id="download-form" class="download-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="download-info">
                 <span class="download-icon">📁</span>
@@ -201,6 +202,16 @@
                         <span class="eye-icon">👁️</span>
                     </button>
                 </div>
+            </div>
+
+            <div id="download-status" style="margin-bottom: 1rem; text-align: center;"></div>
+
+            <div class="encryption-info">
+                <h4>🛡️ End-to-End Decryption:</h4>
+                <ul>
+                    <li>✓ File decrypted IN YOUR BROWSER</li>
+                    <li>✓ Server only sends encrypted data</li>
+                </ul>
             </div>
 
             <div class="modal-actions">
@@ -241,6 +252,12 @@
 
 {% block extra_js %}
 <script>
+    // Store file data globally for E2E operations
+    let currentFileId = null;
+    let currentFilename = null;
+    let currentFileSalt = null;
+    let currentMimeType = null;
+
     // Upload modal
     function openUploadModal() {
         document.getElementById('upload-modal').classList.add('active');
@@ -257,20 +274,113 @@
         document.getElementById('file-input').value = '';
         document.getElementById('file-preview').style.display = 'none';
         document.querySelector('.upload-zone-content').style.display = 'block';
+        document.getElementById('upload-status').innerHTML = '';
+        document.getElementById('encrypt-password').value = '';
     }
 
-    // Download modal
-    function openDownloadModal(fileId, filename) {
+    // E2E Upload Handler - Encrypts file in browser before upload
+    async function handleE2EUpload(event) {
+        event.preventDefault();
+
+        const fileInput = document.getElementById('file-input');
+        const passwordInput = document.getElementById('encrypt-password');
+        const statusEl = document.getElementById('upload-status');
+        const submitBtn = document.getElementById('upload-submit');
+
+        if (!fileInput.files[0]) {
+            statusEl.innerHTML = '<span style="color: #eb3349;">❌ Please select a file</span>';
+            return false;
+        }
+
+        if (passwordInput.value.length < 6) {
+            statusEl.innerHTML = '<span style="color: #eb3349;">❌ Password must be at least 6 characters</span>';
+            return false;
+        }
+
+        const file = fileInput.files[0];
+        const password = passwordInput.value;
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+
+        // Disable submit button
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Encrypting...</span>';
+
+        // Use E2E upload function from e2e-crypto.js
+        const success = await e2eUploadFile(file, password, csrfToken);
+
+        if (!success) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span class="btn-icon">🔒</span><span class="btn-text">Encrypt & Upload</span>';
+        }
+
+        return false;
+    }
+
+    // Download modal - Updated for E2E
+    async function openDownloadModal(fileId, filename) {
         document.getElementById('download-modal').classList.add('active');
         document.getElementById('download-filename').textContent = filename;
-        document.getElementById('download-form').action = '/download/' + fileId;
         document.getElementById('decrypt-password').value = '';
+        document.getElementById('download-status').innerHTML = '';
         document.body.style.overflow = 'hidden';
+
+        // Store current file info
+        currentFileId = fileId;
+        currentFilename = filename;
+
+        // Fetch file salt and filename for E2E decryption
+        try {
+            const response = await fetch('/file-info/' + fileId);
+            if (response.ok) {
+                const data = await response.json();
+                currentFileSalt = data.salt;
+                // Update filename from server to be sure
+                if (data.filename) {
+                    currentFilename = data.filename;
+                    document.getElementById('download-filename').textContent = currentFilename;
+                }
+                currentMimeType = data.mime_type;
+            }
+        } catch (error) {
+            console.error('Error fetching file info:', error);
+        }
     }
 
     function closeDownloadModal() {
         document.getElementById('download-modal').classList.remove('active');
         document.body.style.overflow = '';
+        currentFileId = null;
+        currentFilename = null;
+        currentFileSalt = null;
+        currentMimeType = null;
+    }
+
+    // E2E Download handler
+    async function handleE2EDownload(event) {
+        event.preventDefault();
+
+        const password = document.getElementById('decrypt-password').value;
+        const csrfToken = document.querySelector('#download-form input[name="csrf_token"]').value;
+
+        if (!password) {
+            document.getElementById('download-status').innerHTML = '<span style="color: #eb3349;">❌ Password required</span>';
+            return false;
+        }
+
+        if (!currentFileId || !currentFileSalt) {
+            document.getElementById('download-status').innerHTML = '<span style="color: #eb3349;">❌ File info not available</span>';
+            return false;
+        }
+
+        // Ensure filename is safe
+        const safeFilename = currentFilename || 'downloaded_file';
+        const safeMimeType = currentMimeType || 'application/octet-stream';
+        console.log('Initiating download for:', safeFilename, 'Type:', safeMimeType);
+
+        // Use E2E download function
+        await e2eDownloadFile(currentFileId, password, safeFilename, currentFileSalt, csrfToken, safeMimeType);
+
+        return false;
     }
 
     // Delete modal
@@ -361,5 +471,8 @@
             }
         });
     });
+
+    // Hook up download form to E2E handler
+    document.getElementById('download-form').addEventListener('submit', handleE2EDownload);
 </script>
 {% endblock %}

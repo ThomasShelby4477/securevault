@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Secure Web-Based File Locking & Password Protection System - Protect your files with military-grade encryption">
+    <meta name="description"
+        content="Secure Web-Based File Locking & Password Protection System - Protect your files with military-grade encryption">
     <title>{% block title %}SecureVault{% endblock %} | File Locker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +13,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
+
 <body>
     <!-- Animated Background -->
     <div class="bg-animation">
@@ -27,10 +30,12 @@
                 <span class="brand-text">SecureVault</span>
             </a>
             <div class="nav-links">
-                <a href="{{ url_for('files.dashboard') }}" class="nav-link {% if request.endpoint == 'files.dashboard' %}active{% endif %}">
+                <a href="{{ url_for('files.dashboard') }}"
+                    class="nav-link {% if request.endpoint == 'files.dashboard' %}active{% endif %}">
                     <span class="nav-icon">📁</span> Files
                 </a>
-                <a href="{{ url_for('files.activity_logs') }}" class="nav-link {% if request.endpoint == 'files.activity_logs' %}active{% endif %}">
+                <a href="{{ url_for('files.activity_logs') }}"
+                    class="nav-link {% if request.endpoint == 'files.activity_logs' %}active{% endif %}">
                     <span class="nav-icon">📋</span> Activity
                 </a>
                 <div class="nav-user">
@@ -47,19 +52,20 @@
 
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="flash-container">
-            {% for category, message in messages %}
-            <div class="flash-message flash-{{ category }}" onclick="this.remove()">
-                <span class="flash-icon">
-                    {% if category == 'success' %}✅{% elif category == 'error' %}❌{% elif category == 'info' %}ℹ️{% else %}⚠️{% endif %}
-                </span>
-                <span class="flash-text">{{ message }}</span>
-                <span class="flash-close">×</span>
-            </div>
-            {% endfor %}
+    {% if messages %}
+    <div class="flash-container">
+        {% for category, message in messages %}
+        <div class="flash-message flash-{{ category }}" onclick="this.remove()">
+            <span class="flash-icon">
+                {% if category == 'success' %}✅{% elif category == 'error' %}❌{% elif category == 'info' %}ℹ️{% else
+                %}⚠️{% endif %}
+            </span>
+            <span class="flash-text">{{ message }}</span>
+            <span class="flash-close">×</span>
         </div>
-        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
     {% endwith %}
 
     <!-- Main Content -->
@@ -69,10 +75,12 @@
 
     <!-- Footer -->
     <footer class="footer">
-        <p>🔐 SecureVault — AES-256 Encrypted • PBKDF2 Key Derivation • bcrypt Password Hashing</p>
+        <p>🔐 SecureVault — End-to-End Encrypted • AES-256-GCM • PBKDF2 (100k iterations)</p>
     </footer>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=2"></script>
+    <script src="{{ url_for('static', filename='js/e2e-crypto.js') }}?v=2"></script>
     {% block extra_js %}{% endblock %}
 </body>
+
 </html>

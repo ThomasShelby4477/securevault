@@ -52,67 +52,15 @@ def dashboard():
 @files_bp.route('/upload', methods=['POST'])
 @login_required
 def upload_file():
-    """Handle file upload with encryption."""
-    form = UploadForm()
+    """
+    DEPRECATED: Legacy server-side encryption.
+    Redirects to dashboard or returns error.
+    New uploads must use E2E encryption.
+    """
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'error': 'Server-side encryption is disabled. Use E2E encryption.'}), 400
     
-    if form.validate_on_submit():
-        file = form.file.data
-        password = form.password.data
-        
-        # Read file data
-        file_data = file.read()
-        original_filename = secure_filename(file.filename)
-        file_size = len(file_data)
-        
-        # Encrypt the file
-        try:
-            encrypted_data, salt = CryptoEngine.encrypt_file(file_data, password)
-        except Exception as e:
-            flash('Encryption failed. Please try again.', 'error')
-            return redirect(url_for('files.dashboard'))
-        
-        # Generate unique filename for storage
-        encrypted_filename = f"{uuid.uuid4().hex}.enc"
-        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], encrypted_filename)
-        
-        # Ensure upload directory exists
-        os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
-        
-        # Save encrypted file
-        with open(file_path, 'wb') as f:
-            f.write(encrypted_data)
-        
-        # Create database record
-        file_record = File(
-            original_filename=original_filename,
-            encrypted_filename=encrypted_filename,
-            file_size=file_size,
-            mime_type=file.content_type,
-            salt=salt,
-            is_locked=True,
-            user_id=current_user.id
-        )
-        
-        db.session.add(file_record)
-        db.session.commit()
-        
-        # Log upload
-        AuditLog.log(
-            action=AuditLog.ACTION_FILE_UPLOAD,
-            user_id=current_user.id,
-            resource_type='file',
-            resource_id=file_record.id,
-            details=f'Uploaded: {original_filename} ({file_record.formatted_size})',
-            ip_address=request.remote_addr,
-            status='success'
-        )
-        
-        flash(f'File "{original_filename}" uploaded and encrypted successfully!', 'success')
-    else:
-        for field, errors in form.errors.items():
-            for error in errors:
-                flash(f'{error}', 'error')
-    
+    flash('Standard upload is disabled. Please use the "Upload & Encrypt (E2E)" button.', 'warning')
     return redirect(url_for('files.dashboard'))
 
 
@@ -253,3 +201,120 @@ def activity_logs():
         .paginate(page=page, per_page=20, error_out=False)
     
     return render_template('logs.html', logs=logs)
+
+
+# ============== E2E Encrypted Routes ==============
+
+@files_bp.route('/upload-e2e', methods=['POST'])
+@login_required
+def upload_e2e():
+    """
+    Handle E2E encrypted file upload.
+    File is already encrypted in the browser - server just stores it.
+    """
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+    
+    file = request.files['file']
+    salt_b64 = request.form.get('salt')
+    original_filename = request.form.get('original_filename', 'unknown')
+    original_size = request.form.get('original_size', 0)
+    
+    if not salt_b64:
+        return jsonify({'error': 'Missing encryption salt'}), 400
+    
+    # Read the already-encrypted data
+    encrypted_data = file.read()
+    
+    # Generate unique filename for storage
+    encrypted_filename = f"{uuid.uuid4().hex}.e2e"
+    file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], encrypted_filename)
+    
+    # Ensure upload directory exists
+    os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
+    
+    # Save encrypted file (already encrypted by browser)
+    with open(file_path, 'wb') as f:
+        f.write(encrypted_data)
+    
+    # Create database record
+    file_record = File(
+        original_filename=secure_filename(original_filename),
+        encrypted_filename=encrypted_filename,
+        file_size=int(original_size),
+        mime_type='application/octet-stream',
+        salt=salt_b64,  # Store base64 salt for E2E
+        is_locked=True,
+        is_e2e=True,  # Mark as E2E encrypted
+        user_id=current_user.id
+    )
+    
+    db.session.add(file_record)
+    db.session.commit()
+    
+    # Log upload
+    AuditLog.log(
+        action=AuditLog.ACTION_FILE_UPLOAD,
+        user_id=current_user.id,
+        resource_type='file',
+        resource_id=file_record.id,
+        details=f'E2E Upload: {original_filename} ({file_record.formatted_size})',
+        ip_address=request.remote_addr,
+        status='success'
+    )
+    
+    return jsonify({'success': True, 'message': 'File uploaded successfully'})
+
+
+@files_bp.route('/download-e2e/<int:file_id>', methods=['POST'])
+@login_required
+def download_e2e(file_id):
+    """
+    Download E2E encrypted file.
+    Returns raw encrypted bytes - decryption happens in browser.
+    """
+    file_record = File.query.filter_by(id=file_id, user_id=current_user.id).first_or_404()
+    
+    # Read encrypted file
+    file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], file_record.encrypted_filename)
+    
+    if not os.path.exists(file_path):
+        return jsonify({'error': 'File not found'}), 404
+    
+    with open(file_path, 'rb') as f:
+        encrypted_data = f.read()
+    
+    # Log download
+    file_record.record_access()
+    AuditLog.log(
+        action=AuditLog.ACTION_FILE_DOWNLOAD,
+        user_id=current_user.id,
+        resource_type='file',
+        resource_id=file_record.id,
+        details=f'E2E Download: {file_record.original_filename}',
+        ip_address=request.remote_addr,
+        status='success'
+    )
+    
+    # Return raw encrypted bytes - browser will decrypt
+    return send_file(
+        BytesIO(encrypted_data),
+        mimetype='application/octet-stream',
+        as_attachment=False
+    )
+
+
+@files_bp.route('/file-info/<int:file_id>')
+@login_required
+def file_info(file_id):
+    """Get file metadata for E2E decryption."""
+    file_record = File.query.filter_by(id=file_id, user_id=current_user.id).first_or_404()
+    
+    return jsonify({
+        'id': file_record.id,
+        'filename': file_record.original_filename,
+        'salt': file_record.salt,
+        'is_e2e': getattr(file_record, 'is_e2e', False),
+        'size': file_record.file_size,
+        'mime_type': file_record.mime_type or 'application/octet-stream'
+    })
