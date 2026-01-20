@@ -219,6 +219,7 @@ def upload_e2e():
     salt_b64 = request.form.get('salt')
     original_filename = request.form.get('original_filename', 'unknown')
     original_size = request.form.get('original_size', 0)
+    mime_type = request.form.get('mime_type', 'application/octet-stream')
     
     if not salt_b64:
         return jsonify({'error': 'Missing encryption salt'}), 400
@@ -242,7 +243,7 @@ def upload_e2e():
         original_filename=secure_filename(original_filename),
         encrypted_filename=encrypted_filename,
         file_size=int(original_size),
-        mime_type='application/octet-stream',
+        mime_type=mime_type,
         salt=salt_b64,  # Store base64 salt for E2E
         is_locked=True,
         is_e2e=True,  # Mark as E2E encrypted

@@ -182,6 +182,7 @@ async function e2eUploadFile(file, password, csrfToken) {
         formData.append('salt', E2ECrypto.arrayToBase64(salt));
         formData.append('original_filename', file.name);
         formData.append('original_size', file.size);
+        formData.append('mime_type', file.type || 'application/octet-stream');
         formData.append('e2e_encrypted', 'true');
 
         // Upload to server
@@ -269,7 +270,7 @@ async function e2eDownloadFile(fileId, password, filename, salt, csrfToken, mime
         setTimeout(() => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-        }, 100);
+        }, 5000);
 
         if (statusEl) {
             statusEl.innerHTML = '<span class="success">✅ File decrypted & downloaded!</span>';
