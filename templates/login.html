@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card glass-card">
+        <div class="auth-header">
+            <div class="auth-icon">
+                <span class="lock-animation">🔐</span>
+            </div>
+            <h1>Welcome Back</h1>
+            <p>Enter your credentials to access your secure vault</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.login') }}" class="auth-form">
+            {{ form.hidden_tag() }}
+
+            <div class="form-group">
+                <label for="email" class="form-label">
+                    <span class="label-icon">📧</span> Email Address
+                </label>
+                {{ form.email(class="form-input", placeholder="you@example.com", id="email") }}
+                {% if form.email.errors %}
+                {% for error in form.email.errors %}
+                <span class="error-text">{{ error }}</span>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="password" class="form-label">
+                    <span class="label-icon">🔑</span> Password
+                </label>
+                <div class="password-wrapper">
+                    {{ form.password(class="form-input", placeholder="••••••••", id="password") }}
+                    <button type="button" class="toggle-password" onclick="togglePassword('password')">
+                        <span class="eye-icon">👁️</span>
+                    </button>
+                </div>
+                {% if form.password.errors %}
+                {% for error in form.password.errors %}
+                <span class="error-text">{{ error }}</span>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">
+                <span class="btn-icon">🔓</span>
+                <span class="btn-text">Sign In</span>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Don't have an account? <a href="{{ url_for('auth.signup') }}" class="auth-link">Create one</a></p>
+        </div>
+
+        <div class="security-badges">
+            <span class="badge">🔒 AES-256</span>
+            <span class="badge">🛡️ bcrypt</span>
+            <span class="badge">✅ Secure</span>
+        </div>
+    </div>
+</div>
+{% endblock %}

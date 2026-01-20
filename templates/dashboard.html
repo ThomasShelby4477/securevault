@@ -1,0 +1,365 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="header-content">
+            <h1>Your Secure Vault</h1>
+            <p>{{ files|length }} file{% if files|length != 1 %}s{% endif %} encrypted and protected</p>
+        </div>
+        <button class="btn btn-primary upload-btn" onclick="openUploadModal()">
+            <span class="btn-icon">📤</span>
+            <span class="btn-text">Upload File</span>
+        </button>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card glass-card">
+            <div class="stat-icon">📁</div>
+            <div class="stat-info">
+                <span class="stat-value">{{ files|length }}</span>
+                <span class="stat-label">Total Files</span>
+            </div>
+        </div>
+        <div class="stat-card glass-card">
+            <div class="stat-icon">🔒</div>
+            <div class="stat-info">
+                <span class="stat-value">{{ files|selectattr('is_locked')|list|length }}</span>
+                <span class="stat-label">Locked</span>
+            </div>
+        </div>
+        <div class="stat-card glass-card">
+            <div class="stat-icon">💾</div>
+            <div class="stat-info">
+                <span class="stat-value">
+                    {% set total_size = files|map(attribute='file_size')|sum %}
+                    {% if total_size < 1024 %}{{ total_size }} B {% elif total_size < 1048576 %}{{ "%.1f"
+                        |format(total_size/1024) }} KB {% elif total_size < 1073741824 %}{{ "%.1f"
+                        |format(total_size/1048576) }} MB {% else %}{{ "%.1f" |format(total_size/1073741824) }} GB{%
+                        endif %} </span>
+                        <span class="stat-label">Total Size</span>
+            </div>
+        </div>
+        <div class="stat-card glass-card">
+            <div class="stat-icon">🛡️</div>
+            <div class="stat-info">
+                <span class="stat-value">AES-256</span>
+                <span class="stat-label">Encryption</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Files Grid -->
+    {% if files %}
+    <div class="files-section">
+        <h2 class="section-title">Your Files</h2>
+        <div class="files-grid">
+            {% for file in files %}
+            <div class="file-card glass-card" data-file-id="{{ file.id }}">
+                <div class="file-icon">
+                    {% if file.mime_type and 'image' in file.mime_type %}🖼️
+                    {% elif file.mime_type and 'pdf' in file.mime_type %}📄
+                    {% elif file.mime_type and 'video' in file.mime_type %}🎬
+                    {% elif file.mime_type and 'audio' in file.mime_type %}🎵
+                    {% elif file.mime_type and 'zip' in file.mime_type %}📦
+                    {% elif file.mime_type and 'text' in file.mime_type %}📝
+                    {% else %}📁{% endif %}
+                </div>
+                <div class="file-info">
+                    <h3 class="file-name" title="{{ file.original_filename }}">{{ file.original_filename }}</h3>
+                    <div class="file-meta">
+                        <span class="file-size">{{ file.formatted_size }}</span>
+                        <span class="file-date">{{ file.uploaded_at.strftime('%b %d, %Y') }}</span>
+                    </div>
+                </div>
+                <div class="file-status">
+                    {% if file.is_locked %}
+                    <span class="status-badge locked">🔒 Encrypted</span>
+                    {% else %}
+                    <span class="status-badge unlocked">🔓 Unlocked</span>
+                    {% endif %}
+                </div>
+                <div class="file-actions">
+                    <button class="btn btn-sm btn-success"
+                        onclick="openDownloadModal({{ file.id }}, '{{ file.original_filename|e }}')">
+                        <span>📥</span> Download
+                    </button>
+                    <button class="btn btn-sm btn-danger"
+                        onclick="confirmDelete({{ file.id }}, '{{ file.original_filename|e }}')">
+                        <span>🗑️</span> Delete
+                    </button>
+                </div>
+                {% if file.failed_attempts > 0 %}
+                <div class="file-warning">
+                    ⚠️ {{ file.failed_attempts }} failed attempt{% if file.failed_attempts > 1 %}s{% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state glass-card">
+        <div class="empty-icon">🔐</div>
+        <h2>Your vault is empty</h2>
+        <p>Upload your first file to get started with secure encryption</p>
+        <button class="btn btn-primary" onclick="openUploadModal()">
+            <span class="btn-icon">📤</span>
+            <span class="btn-text">Upload Your First File</span>
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Upload Modal -->
+<div id="upload-modal" class="modal">
+    <div class="modal-content glass-card">
+        <div class="modal-header">
+            <h2>📤 Upload & Encrypt File</h2>
+            <button class="modal-close" onclick="closeUploadModal()">×</button>
+        </div>
+        <form method="POST" action="{{ url_for('files.upload_file') }}" enctype="multipart/form-data"
+            class="upload-form">
+            {{ upload_form.hidden_tag() }}
+
+            <div class="upload-zone" id="upload-zone">
+                <div class="upload-zone-content">
+                    <span class="upload-icon">📁</span>
+                    <p>Drag & drop your file here or</p>
+                    <label for="file-input" class="upload-browse">Browse Files</label>
+                    {{ upload_form.file(id="file-input", class="file-input", accept="*/*") }}
+                </div>
+                <div class="file-preview" id="file-preview" style="display: none;">
+                    <span class="preview-icon">📄</span>
+                    <span class="preview-name" id="preview-name"></span>
+                    <span class="preview-size" id="preview-size"></span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="encrypt-password" class="form-label">
+                    <span class="label-icon">🔐</span> Encryption Password
+                </label>
+                <div class="password-wrapper">
+                    {{ upload_form.password(id="encrypt-password", class="form-input", placeholder="Enter a strong
+                    password") }}
+                    <button type="button" class="toggle-password" onclick="togglePassword('encrypt-password')">
+                        <span class="eye-icon">👁️</span>
+                    </button>
+                </div>
+                <div class="password-strength" id="encrypt-password-strength"></div>
+                <p class="form-hint">⚠️ Remember this password! It cannot be recovered.</p>
+            </div>
+
+            <div class="encryption-info">
+                <h4>🛡️ Your file will be protected with:</h4>
+                <ul>
+                    <li>✓ AES-256-GCM authenticated encryption</li>
+                    <li>✓ PBKDF2 key derivation (100,000 iterations)</li>
+                    <li>✓ Unique random salt per file</li>
+                </ul>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeUploadModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="upload-submit">
+                    <span class="btn-icon">🔒</span>
+                    <span class="btn-text">Encrypt & Upload</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Download Modal -->
+<div id="download-modal" class="modal">
+    <div class="modal-content glass-card">
+        <div class="modal-header">
+            <h2>📥 Download & Decrypt</h2>
+            <button class="modal-close" onclick="closeDownloadModal()">×</button>
+        </div>
+        <form method="POST" id="download-form" class="download-form">
+            {{ password_form.hidden_tag() }}
+
+            <div class="download-info">
+                <span class="download-icon">📁</span>
+                <span class="download-filename" id="download-filename"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="decrypt-password" class="form-label">
+                    <span class="label-icon">🔑</span> Decryption Password
+                </label>
+                <div class="password-wrapper">
+                    <input type="password" name="password" id="decrypt-password" class="form-input"
+                        placeholder="Enter file password" required>
+                    <button type="button" class="toggle-password" onclick="togglePassword('decrypt-password')">
+                        <span class="eye-icon">👁️</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeDownloadModal()">Cancel</button>
+                <button type="submit" class="btn btn-success">
+                    <span class="btn-icon">🔓</span>
+                    <span class="btn-text">Decrypt & Download</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="modal">
+    <div class="modal-content glass-card modal-small">
+        <div class="modal-header">
+            <h2>⚠️ Confirm Deletion</h2>
+            <button class="modal-close" onclick="closeDeleteModal()">×</button>
+        </div>
+        <div class="delete-warning">
+            <p>Are you sure you want to delete <strong id="delete-filename"></strong>?</p>
+            <p class="warning-text">This action cannot be undone. The encrypted file will be permanently removed.</p>
+        </div>
+        <form method="POST" id="delete-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+                <button type="submit" class="btn btn-danger">
+                    <span class="btn-icon">🗑️</span>
+                    <span class="btn-text">Delete Forever</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Upload modal
+    function openUploadModal() {
+        document.getElementById('upload-modal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeUploadModal() {
+        document.getElementById('upload-modal').classList.remove('active');
+        document.body.style.overflow = '';
+        resetUploadForm();
+    }
+
+    function resetUploadForm() {
+        document.getElementById('file-input').value = '';
+        document.getElementById('file-preview').style.display = 'none';
+        document.querySelector('.upload-zone-content').style.display = 'block';
+    }
+
+    // Download modal
+    function openDownloadModal(fileId, filename) {
+        document.getElementById('download-modal').classList.add('active');
+        document.getElementById('download-filename').textContent = filename;
+        document.getElementById('download-form').action = '/download/' + fileId;
+        document.getElementById('decrypt-password').value = '';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeDownloadModal() {
+        document.getElementById('download-modal').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    // Delete modal
+    function confirmDelete(fileId, filename) {
+        document.getElementById('delete-modal').classList.add('active');
+        document.getElementById('delete-filename').textContent = filename;
+        document.getElementById('delete-form').action = '/delete/' + fileId;
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('delete-modal').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    // File input handling
+    document.getElementById('file-input').addEventListener('change', function (e) {
+        const file = e.target.files[0];
+        if (file) {
+            document.querySelector('.upload-zone-content').style.display = 'none';
+            document.getElementById('file-preview').style.display = 'flex';
+            document.getElementById('preview-name').textContent = file.name;
+            document.getElementById('preview-size').textContent = formatFileSize(file.size);
+        }
+    });
+
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+        if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+        return (bytes / 1073741824).toFixed(1) + ' GB';
+    }
+
+    // Drag and drop
+    const uploadZone = document.getElementById('upload-zone');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+        uploadZone.classList.add('drag-over');
+    }
+
+    function unhighlight(e) {
+        uploadZone.classList.remove('drag-over');
+    }
+
+    uploadZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        const fileInput = document.getElementById('file-input');
+        fileInput.files = files;
+        fileInput.dispatchEvent(new Event('change'));
+    }
+
+    // Close modals on escape
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            closeUploadModal();
+            closeDownloadModal();
+            closeDeleteModal();
+        }
+    });
+
+    // Close modals on backdrop click
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', function (e) {
+            if (e.target === this) {
+                closeUploadModal();
+                closeDownloadModal();
+                closeDeleteModal();
+            }
+        });
+    });
+</script>
+{% endblock %}

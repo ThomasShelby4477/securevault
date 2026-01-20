@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+
+{% block title %}Activity Logs{% endblock %}
+
+{% block content %}
+<div class="logs-container">
+    <div class="logs-header">
+        <h1>📋 Activity Logs</h1>
+        <p>Track all security events and file operations</p>
+    </div>
+
+    {% if logs.items %}
+    <div class="logs-table-wrapper glass-card">
+        <table class="logs-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Action</th>
+                    <th>Details</th>
+                    <th>IP Address</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs.items %}
+                <tr class="log-row log-{{ log.status }}">
+                    <td class="log-time">
+                        <span class="time-date">{{ log.timestamp.strftime('%b %d, %Y') }}</span>
+                        <span class="time-hour">{{ log.timestamp.strftime('%H:%M:%S') }}</span>
+                    </td>
+                    <td class="log-action">
+                        <span class="action-icon">{{ log.action_icon }}</span>
+                        <span class="action-text">{{ log.action.replace('_', ' ').title() }}</span>
+                    </td>
+                    <td class="log-details">
+                        {{ log.details or '—' }}
+                    </td>
+                    <td class="log-ip">
+                        <code>{{ log.ip_address or 'Unknown' }}</code>
+                        {% if log.ip_address %}
+                        <span class="ip-location">{{ get_ip_location(log.ip_address) }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="log-status">
+                        <span class="status-badge status-{{ log.status }}">
+                            {% if log.status == 'success' %}✅{% elif log.status == 'failure' %}❌{% else %}⚠️{% endif %}
+                            {{ log.status.title() }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if logs.pages > 1 %}
+    <div class="pagination">
+        {% if logs.has_prev %}
+        <a href="{{ url_for('files.activity_logs', page=logs.prev_num) }}" class="page-link">
+            ← Previous
+        </a>
+        {% endif %}
+
+        <span class="page-info">
+            Page {{ logs.page }} of {{ logs.pages }}
+        </span>
+
+        {% if logs.has_next %}
+        <a href="{{ url_for('files.activity_logs', page=logs.next_num) }}" class="page-link">
+            Next →
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state glass-card">
+        <div class="empty-icon">📋</div>
+        <h2>No activity yet</h2>
+        <p>Your activity log is empty. Actions like file uploads, downloads, and login attempts will appear here.</p>
+    </div>
+    {% endif %}
+
+    <!-- Security Summary -->
+    <div class="security-summary glass-card">
+        <h3>🛡️ Security Summary</h3>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <span class="summary-icon">🔐</span>
+                <div class="summary-info">
+                    <span class="summary-label">Encryption</span>
+                    <span class="summary-value">AES-256-GCM</span>
+                </div>
+            </div>
+            <div class="summary-item">
+                <span class="summary-icon">🔑</span>
+                <div class="summary-info">
+                    <span class="summary-label">Key Derivation</span>
+                    <span class="summary-value">PBKDF2 (100k)</span>
+                </div>
+            </div>
+            <div class="summary-item">
+                <span class="summary-icon">🔒</span>
+                <div class="summary-info">
+                    <span class="summary-label">Password Hash</span>
+                    <span class="summary-value">bcrypt</span>
+                </div>
+            </div>
+            <div class="summary-item">
+                <span class="summary-icon">✅</span>
+                <div class="summary-info">
+                    <span class="summary-label">Integrity</span>
+                    <span class="summary-value">GCM Auth Tag</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

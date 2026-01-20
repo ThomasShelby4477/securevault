@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+
+{% block title %}Sign Up{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card glass-card">
+        <div class="auth-header">
+            <div class="auth-icon">
+                <span class="lock-animation">🛡️</span>
+            </div>
+            <h1>Create Account</h1>
+            <p>Start protecting your files with military-grade encryption</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.signup') }}" class="auth-form">
+            {{ form.hidden_tag() }}
+
+            <div class="form-group">
+                <label for="username" class="form-label">
+                    <span class="label-icon">👤</span> Username
+                </label>
+                {{ form.username(class="form-input", placeholder="Choose a username", id="username") }}
+                {% if form.username.errors %}
+                {% for error in form.username.errors %}
+                <span class="error-text">{{ error }}</span>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="email" class="form-label">
+                    <span class="label-icon">📧</span> Email Address
+                </label>
+                {{ form.email(class="form-input", placeholder="you@example.com", id="email") }}
+                {% if form.email.errors %}
+                {% for error in form.email.errors %}
+                <span class="error-text">{{ error }}</span>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="password" class="form-label">
+                    <span class="label-icon">🔑</span> Password
+                </label>
+                <div class="password-wrapper">
+                    {{ form.password(class="form-input", placeholder="At least 8 characters", id="password") }}
+                    <button type="button" class="toggle-password" onclick="togglePassword('password')">
+                        <span class="eye-icon">👁️</span>
+                    </button>
+                </div>
+                {% if form.password.errors %}
+                {% for error in form.password.errors %}
+                <span class="error-text">{{ error }}</span>
+                {% endfor %}
+                {% endif %}
+                <div class="password-strength" id="password-strength"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password" class="form-label">
+                    <span class="label-icon">🔐</span> Confirm Password
+                </label>
+                <div class="password-wrapper">
+                    {{ form.confirm_password(class="form-input", placeholder="Repeat your password",
+                    id="confirm_password") }}
+                    <button type="button" class="toggle-password" onclick="togglePassword('confirm_password')">
+                        <span class="eye-icon">👁️</span>
+                    </button>
+                </div>
+                {% if form.confirm_password.errors %}
+                {% for error in form.confirm_password.errors %}
+                <span class="error-text">{{ error }}</span>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">
+                <span class="btn-icon">✨</span>
+                <span class="btn-text">Create Account</span>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Already have an account? <a href="{{ url_for('auth.login') }}" class="auth-link">Sign in</a></p>
+        </div>
+
+        <div class="security-info">
+            <h4>🔒 Your Security Matters</h4>
+            <ul>
+                <li>✓ Passwords hashed with bcrypt (never stored in plain text)</li>
+                <li>✓ AES-256-GCM encryption for all files</li>
+                <li>✓ PBKDF2 key derivation with 100,000 iterations</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
